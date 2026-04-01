@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Alia – Katze und Mäuse</title>
+    <title>Alya und Mustafa Dayi Spiel – Katze und Mäuse</title>
     <style>
       :root {
         color-scheme: dark;
@@ -86,7 +86,7 @@
   </head>
   <body>
     <main class="game-wrap">
-      <h1>🎮 Alia: Katze fängt Mäuse</h1>
+      <h1>🎮 Alya und Mustafa Dayi Spiel</h1>
       <p class="info">
         Steuere die Katze mit <strong>Pfeiltasten</strong> oder <strong>WASD</strong>. Fange so viele Mäuse wie möglich.
       </p>
@@ -120,7 +120,9 @@
         level: 1,
         keys: {},
         mice: [],
+        traps: [],
         mouseSpawnTimer: 0,
+        trapSpawnTimer: 0,
         lastFrame: 0,
       };
 
@@ -144,7 +146,9 @@
         game.level = 1;
         game.keys = {};
         game.mice = [];
+        game.traps = [];
         game.mouseSpawnTimer = 0;
+        game.trapSpawnTimer = 0;
         cat.x = 120;
         cat.y = 120;
         cat.size = cat.baseSize;
@@ -171,6 +175,14 @@
         const colors = ["#fca5a5", "#fde68a", "#86efac", "#7dd3fc", "#c4b5fd"];
         const color = colors[Math.floor(Math.random() * colors.length)];
         game.mice.push({ x, y, radius, life: 5.5, color });
+      }
+
+      function spawnTrap() {
+        const size = 30;
+        const padding = 28;
+        const x = padding + Math.random() * (canvas.width - 2 * padding);
+        const y = padding + Math.random() * (canvas.height - 2 * padding);
+        game.traps.push({ x, y, size, life: 10 });
       }
 
       function ensureAudio() {
@@ -201,6 +213,12 @@
         if (!audioCtx) return;
         playTone(540, 0.08, "triangle", 0.08);
         setTimeout(() => playTone(760, 0.09, "triangle", 0.07), 45);
+      }
+
+      function playTrapSound() {
+        if (!audioCtx) return;
+        playTone(180, 0.14, "square", 0.08);
+        setTimeout(() => playTone(130, 0.16, "square", 0.06), 60);
       }
 
       function startMusic() {
@@ -262,6 +280,23 @@
         }
 
         game.mice = active;
+      }
+
+      function updateTraps(dt) {
+        const active = [];
+
+        for (const trap of game.traps) {
+          trap.life -= dt;
+          const dist = Math.hypot(cat.x - trap.x, cat.y - trap.y);
+          if (dist < cat.size + trap.size * 0.5) {
+            cat.size = cat.baseSize;
+            playTrapSound();
+            continue;
+          }
+          if (trap.life > 0) active.push(trap);
+        }
+
+        game.traps = active;
       }
 
       function drawCat() {
@@ -335,6 +370,37 @@
         }
       }
 
+      function drawTraps() {
+        for (const trap of game.traps) {
+          ctx.save();
+          ctx.translate(trap.x, trap.y);
+          ctx.rotate(Math.sin(trap.life * 3) * 0.04);
+
+          // Basis
+          ctx.fillStyle = "#64748b";
+          ctx.fillRect(-trap.size * 0.5, 8, trap.size, 8);
+
+          // Federn/Zähne
+          const teeth = 7;
+          for (let i = 0; i < teeth; i++) {
+            const x = -trap.size * 0.5 + (i * trap.size) / (teeth - 1);
+            ctx.strokeStyle = "#e2e8f0";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x, 8);
+            ctx.lineTo(x, -8);
+            ctx.stroke();
+          }
+
+          ctx.strokeStyle = "#cbd5e1";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(0, 8, trap.size * 0.35, Math.PI, 0);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
       function drawOverlay(text) {
         ctx.fillStyle = "rgba(2, 6, 23, 0.72)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -372,6 +438,7 @@
           ctx.stroke();
         }
 
+        drawTraps();
         drawMice();
         drawCat();
 
@@ -409,8 +476,17 @@
           spawnMouse();
         }
 
+        // Fallen erscheinen seltener als Mäuse.
+        const trapEvery = Math.max(1.6, 4.8 - game.level * 0.22);
+        game.trapSpawnTimer += dt;
+        if (game.trapSpawnTimer >= trapEvery) {
+          game.trapSpawnTimer = 0;
+          spawnTrap();
+        }
+
         updateCat(dt);
         updateMice(dt);
+        updateTraps(dt);
         updateHud();
         render();
         requestAnimationFrame(gameLoop);
@@ -424,6 +500,7 @@
           game.score = 0;
           game.level = 1;
           game.mice = [];
+          game.traps = [];
           cat.size = cat.baseSize;
         }
         game.running = true;

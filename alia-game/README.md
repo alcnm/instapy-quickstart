@@ -1,4 +1,4 @@
-# Alia – Katze fängt Mäuse
+# Alya und Mustafa Dayi Spiel – Katze fängt Mäuse
 
 Ein kleines Browser-Spiel in einfachem HTML/CSS/JavaScript.
 
@@ -16,3 +16,4 @@ Ein kleines Browser-Spiel in einfachem HTML/CSS/JavaScript.
 - Mit höherem Level erscheinen Mäuse häufiger und die Katze wird schneller.
 - Sound: Hintergrundmusik während des Spiels + Fang-Soundeffekt bei jeder gefangenen Maus.
 - Wachstum: Die Katze wird bei jeder gefangenen Maus etwas größer.
+- Katzenfallen: Erscheinen seltener als Mäuse; wenn die Katze in eine Falle läuft, wird sie wieder klein, das Spiel läuft aber weiter.
