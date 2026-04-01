@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Alia – Katze und Mäuse</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: #0f172a;
+        color: #e2e8f0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+      }
+
+      .game-wrap {
+        width: min(92vw, 860px);
+      }
+
+      h1 {
+        margin: 0 0 0.4rem;
+        font-size: 1.45rem;
+      }
+
+      .info {
+        margin-bottom: 0.8rem;
+        color: #cbd5e1;
+      }
+
+      .hud {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 0.6rem;
+        font-weight: 700;
+        flex-wrap: wrap;
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+        background: #1e293b;
+        border: 2px solid #334155;
+        border-radius: 8px;
+      }
+
+      .actions {
+        margin-top: 0.7rem;
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      button {
+        border: 0;
+        border-radius: 6px;
+        padding: 0.55rem 0.9rem;
+        cursor: pointer;
+        font-weight: 700;
+      }
+
+      #startBtn {
+        background: #22c55e;
+        color: #07210f;
+      }
+
+      #restartBtn {
+        background: #38bdf8;
+        color: #042030;
+      }
+
+      .hint {
+        margin-top: 0.6rem;
+        color: #94a3b8;
+        font-size: 0.95rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="game-wrap">
+      <h1>🎮 Alia: Katze fängt Mäuse</h1>
+      <p class="info">
+        Steuere die Katze mit <strong>Pfeiltasten</strong> oder <strong>WASD</strong>. Fange so viele Mäuse wie möglich.
+      </p>
+      <div class="hud">
+        <div>Punkte: <span id="score">0</span></div>
+        <div>Level: <span id="level">1</span></div>
+        <div>Zeit: <span id="time">60</span>s</div>
+      </div>
+      <canvas id="gameCanvas" width="840" height="480"></canvas>
+      <div class="actions">
+        <button id="startBtn">Start</button>
+        <button id="restartBtn">Neu starten</button>
+      </div>
+      <p class="hint">Tipp: Je höher das Level, desto schneller läuft die Katze und desto häufiger erscheinen Mäuse.</p>
+    </main>
+
+    <script>
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+      const scoreEl = document.getElementById("score");
+      const levelEl = document.getElementById("level");
+      const timeEl = document.getElementById("time");
+      const startBtn = document.getElementById("startBtn");
+      const restartBtn = document.getElementById("restartBtn");
+
+      const game = {
+        running: false,
+        duration: 60,
+        timeLeft: 60,
+        score: 0,
+        level: 1,
+        keys: {},
+        mice: [],
+        mouseSpawnTimer: 0,
+        lastFrame: 0,
+      };
+
+      const cat = {
+        x: 120,
+        y: 120,
+        size: 28,
+        speed: 220,
+      };
+
+      function resetGame() {
+        game.running = false;
+        game.timeLeft = game.duration;
+        game.score = 0;
+        game.level = 1;
+        game.keys = {};
+        game.mice = [];
+        game.mouseSpawnTimer = 0;
+        cat.x = 120;
+        cat.y = 120;
+        updateHud();
+        render();
+      }
+
+      function updateHud() {
+        scoreEl.textContent = String(game.score);
+        levelEl.textContent = String(game.level);
+        timeEl.textContent = String(Math.max(0, Math.ceil(game.timeLeft)));
+      }
+
+      function levelFromScore(score) {
+        // Alle 5 Punkte steigt ein Level.
+        return Math.min(12, 1 + Math.floor(score / 5));
+      }
+
+      function spawnMouse() {
+        const radius = 12;
+        const padding = 20;
+        const x = padding + Math.random() * (canvas.width - 2 * padding);
+        const y = padding + Math.random() * (canvas.height - 2 * padding);
+        game.mice.push({ x, y, radius, life: 5.5 });
+      }
+
+      function updateCat(dt) {
+        const speed = cat.speed + (game.level - 1) * 28;
+        let dx = 0;
+        let dy = 0;
+
+        if (game.keys["ArrowUp"] || game.keys["w"] || game.keys["W"]) dy -= 1;
+        if (game.keys["ArrowDown"] || game.keys["s"] || game.keys["S"]) dy += 1;
+        if (game.keys["ArrowLeft"] || game.keys["a"] || game.keys["A"]) dx -= 1;
+        if (game.keys["ArrowRight"] || game.keys["d"] || game.keys["D"]) dx += 1;
+
+        if (dx !== 0 || dy !== 0) {
+          const len = Math.hypot(dx, dy) || 1;
+          dx /= len;
+          dy /= len;
+          cat.x += dx * speed * dt;
+          cat.y += dy * speed * dt;
+        }
+
+        cat.x = Math.max(cat.size, Math.min(canvas.width - cat.size, cat.x));
+        cat.y = Math.max(cat.size, Math.min(canvas.height - cat.size, cat.y));
+      }
+
+      function updateMice(dt) {
+        const active = [];
+
+        for (const mouse of game.mice) {
+          mouse.life -= dt;
+
+          const dist = Math.hypot(cat.x - mouse.x, cat.y - mouse.y);
+          if (dist < cat.size + mouse.radius) {
+            game.score += 1;
+            continue;
+          }
+
+          if (mouse.life > 0) active.push(mouse);
+        }
+
+        game.mice = active;
+      }
+
+      function drawCat() {
+        ctx.save();
+        ctx.translate(cat.x, cat.y);
+
+        ctx.fillStyle = "#f8fafc";
+        ctx.beginPath();
+        ctx.arc(0, 0, cat.size, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Ohren
+        ctx.fillStyle = "#cbd5e1";
+        ctx.beginPath();
+        ctx.moveTo(-16, -18);
+        ctx.lineTo(-6, -36);
+        ctx.lineTo(2, -16);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(16, -18);
+        ctx.lineTo(6, -36);
+        ctx.lineTo(-2, -16);
+        ctx.fill();
+
+        // Augen
+        ctx.fillStyle = "#0f172a";
+        ctx.beginPath();
+        ctx.arc(-8, -5, 3.2, 0, Math.PI * 2);
+        ctx.arc(8, -5, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Nase
+        ctx.fillStyle = "#f472b6";
+        ctx.beginPath();
+        ctx.moveTo(0, 5);
+        ctx.lineTo(-4, 11);
+        ctx.lineTo(4, 11);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.restore();
+      }
+
+      function drawMice() {
+        for (const mouse of game.mice) {
+          ctx.save();
+          ctx.translate(mouse.x, mouse.y);
+
+          // Maus-Körper
+          ctx.fillStyle = "#94a3b8";
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 12, 8, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Ohren
+          ctx.fillStyle = "#cbd5e1";
+          ctx.beginPath();
+          ctx.arc(-6, -6, 3, 0, Math.PI * 2);
+          ctx.arc(6, -6, 3, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Schwanz
+          ctx.strokeStyle = "#94a3b8";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(11, 1);
+          ctx.quadraticCurveTo(22, 6, 26, 16);
+          ctx.stroke();
+
+          ctx.restore();
+        }
+      }
+
+      function drawOverlay(text) {
+        ctx.fillStyle = "rgba(2, 6, 23, 0.72)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#e2e8f0";
+        ctx.textAlign = "center";
+        ctx.font = "bold 38px Arial";
+        ctx.fillText(text, canvas.width / 2, canvas.height / 2 - 8);
+        ctx.font = "22px Arial";
+        ctx.fillText(`Punkte: ${game.score}`, canvas.width / 2, canvas.height / 2 + 34);
+      }
+
+      function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Spielfeld-Raster
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.12)";
+        ctx.lineWidth = 1;
+        for (let x = 0; x <= canvas.width; x += 40) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, canvas.height);
+          ctx.stroke();
+        }
+        for (let y = 0; y <= canvas.height; y += 40) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(canvas.width, y);
+          ctx.stroke();
+        }
+
+        drawMice();
+        drawCat();
+
+        if (!game.running && game.timeLeft === game.duration) {
+          drawOverlay("Start drücken");
+        } else if (!game.running && game.timeLeft <= 0) {
+          drawOverlay("Zeit vorbei!");
+        }
+      }
+
+      function gameLoop(timestamp) {
+        if (!game.running) return;
+
+        if (!game.lastFrame) game.lastFrame = timestamp;
+        const dt = Math.min(0.035, (timestamp - game.lastFrame) / 1000);
+        game.lastFrame = timestamp;
+
+        game.timeLeft -= dt;
+        if (game.timeLeft <= 0) {
+          game.timeLeft = 0;
+          game.running = false;
+          updateHud();
+          render();
+          return;
+        }
+
+        game.level = levelFromScore(game.score);
+
+        // Mäuse erscheinen mit höherem Level öfter.
+        const spawnEvery = Math.max(0.25, 1.45 - game.level * 0.1);
+        game.mouseSpawnTimer += dt;
+        if (game.mouseSpawnTimer >= spawnEvery) {
+          game.mouseSpawnTimer = 0;
+          spawnMouse();
+        }
+
+        updateCat(dt);
+        updateMice(dt);
+        updateHud();
+        render();
+        requestAnimationFrame(gameLoop);
+      }
+
+      startBtn.addEventListener("click", () => {
+        if (game.running) return;
+        if (game.timeLeft <= 0) {
+          game.timeLeft = game.duration;
+          game.score = 0;
+          game.level = 1;
+          game.mice = [];
+        }
+        game.running = true;
+        game.lastFrame = 0;
+        requestAnimationFrame(gameLoop);
+      });
+
+      restartBtn.addEventListener("click", () => {
+        resetGame();
+      });
+
+      window.addEventListener("keydown", (event) => {
+        game.keys[event.key] = true;
+      });
+
+      window.addEventListener("keyup", (event) => {
+        game.keys[event.key] = false;
+      });
+
+      resetGame();
+    </script>
+  </body>
+</html>
