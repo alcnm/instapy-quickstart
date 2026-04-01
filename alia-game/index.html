@@ -12,7 +12,7 @@
       body {
         margin: 0;
         font-family: Arial, sans-serif;
-        background: #0f172a;
+        background: radial-gradient(circle at top, #1d4ed8 0%, #0f172a 45%, #020617 100%);
         color: #e2e8f0;
         display: flex;
         justify-content: center;
@@ -46,9 +46,10 @@
         display: block;
         width: 100%;
         height: auto;
-        background: #1e293b;
+        background: linear-gradient(180deg, #1e3a8a 0%, #0f172a 65%, #020617 100%);
         border: 2px solid #334155;
         border-radius: 8px;
+        box-shadow: 0 10px 35px rgba(15, 23, 42, 0.55);
       }
 
       .actions {
@@ -127,8 +128,14 @@
         x: 120,
         y: 120,
         size: 28,
+        baseSize: 28,
+        maxSize: 60,
         speed: 220,
       };
+
+      let audioCtx = null;
+      let musicTimer = null;
+      let musicStep = 0;
 
       function resetGame() {
         game.running = false;
@@ -140,6 +147,7 @@
         game.mouseSpawnTimer = 0;
         cat.x = 120;
         cat.y = 120;
+        cat.size = cat.baseSize;
         updateHud();
         render();
       }
@@ -160,7 +168,58 @@
         const padding = 20;
         const x = padding + Math.random() * (canvas.width - 2 * padding);
         const y = padding + Math.random() * (canvas.height - 2 * padding);
-        game.mice.push({ x, y, radius, life: 5.5 });
+        const colors = ["#fca5a5", "#fde68a", "#86efac", "#7dd3fc", "#c4b5fd"];
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        game.mice.push({ x, y, radius, life: 5.5, color });
+      }
+
+      function ensureAudio() {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === "suspended") {
+          audioCtx.resume();
+        }
+      }
+
+      function playTone(frequency, duration = 0.12, type = "sine", volume = 0.06) {
+        if (!audioCtx) return;
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.value = frequency;
+        gain.gain.setValueAtTime(volume, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + duration);
+      }
+
+      function playCatchSound() {
+        if (!audioCtx) return;
+        playTone(540, 0.08, "triangle", 0.08);
+        setTimeout(() => playTone(760, 0.09, "triangle", 0.07), 45);
+      }
+
+      function startMusic() {
+        if (!audioCtx || musicTimer) return;
+        const notes = [220, 247, 262, 294, 330, 294, 262, 247];
+        musicStep = 0;
+        musicTimer = setInterval(() => {
+          if (!game.running) return;
+          const note = notes[musicStep % notes.length];
+          playTone(note, 0.18, "sawtooth", 0.03);
+          musicStep += 1;
+        }, 260);
+      }
+
+      function stopMusic() {
+        if (musicTimer) {
+          clearInterval(musicTimer);
+          musicTimer = null;
+        }
       }
 
       function updateCat(dt) {
@@ -194,6 +253,8 @@
           const dist = Math.hypot(cat.x - mouse.x, cat.y - mouse.y);
           if (dist < cat.size + mouse.radius) {
             game.score += 1;
+            cat.size = Math.min(cat.maxSize, cat.size + 1.8);
+            playCatchSound();
             continue;
           }
 
@@ -215,29 +276,29 @@
         // Ohren
         ctx.fillStyle = "#cbd5e1";
         ctx.beginPath();
-        ctx.moveTo(-16, -18);
-        ctx.lineTo(-6, -36);
-        ctx.lineTo(2, -16);
+        ctx.moveTo(-cat.size * 0.58, -cat.size * 0.64);
+        ctx.lineTo(-cat.size * 0.2, -cat.size * 1.3);
+        ctx.lineTo(cat.size * 0.08, -cat.size * 0.55);
         ctx.fill();
         ctx.beginPath();
-        ctx.moveTo(16, -18);
-        ctx.lineTo(6, -36);
-        ctx.lineTo(-2, -16);
+        ctx.moveTo(cat.size * 0.58, -cat.size * 0.64);
+        ctx.lineTo(cat.size * 0.2, -cat.size * 1.3);
+        ctx.lineTo(-cat.size * 0.08, -cat.size * 0.55);
         ctx.fill();
 
         // Augen
         ctx.fillStyle = "#0f172a";
         ctx.beginPath();
-        ctx.arc(-8, -5, 3.2, 0, Math.PI * 2);
-        ctx.arc(8, -5, 3.2, 0, Math.PI * 2);
+        ctx.arc(-cat.size * 0.28, -cat.size * 0.18, cat.size * 0.11, 0, Math.PI * 2);
+        ctx.arc(cat.size * 0.28, -cat.size * 0.18, cat.size * 0.11, 0, Math.PI * 2);
         ctx.fill();
 
         // Nase
         ctx.fillStyle = "#f472b6";
         ctx.beginPath();
-        ctx.moveTo(0, 5);
-        ctx.lineTo(-4, 11);
-        ctx.lineTo(4, 11);
+        ctx.moveTo(0, cat.size * 0.18);
+        ctx.lineTo(-cat.size * 0.14, cat.size * 0.38);
+        ctx.lineTo(cat.size * 0.14, cat.size * 0.38);
         ctx.closePath();
         ctx.fill();
 
@@ -250,7 +311,7 @@
           ctx.translate(mouse.x, mouse.y);
 
           // Maus-Körper
-          ctx.fillStyle = "#94a3b8";
+          ctx.fillStyle = mouse.color;
           ctx.beginPath();
           ctx.ellipse(0, 0, 12, 8, 0, 0, Math.PI * 2);
           ctx.fill();
@@ -263,7 +324,7 @@
           ctx.fill();
 
           // Schwanz
-          ctx.strokeStyle = "#94a3b8";
+          ctx.strokeStyle = mouse.color;
           ctx.lineWidth = 2;
           ctx.beginPath();
           ctx.moveTo(11, 1);
@@ -288,8 +349,15 @@
       function render() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        gradient.addColorStop(0, "#1d4ed8");
+        gradient.addColorStop(0.5, "#0f172a");
+        gradient.addColorStop(1, "#020617");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
         // Spielfeld-Raster
-        ctx.strokeStyle = "rgba(148, 163, 184, 0.12)";
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.18)";
         ctx.lineWidth = 1;
         for (let x = 0; x <= canvas.width; x += 40) {
           ctx.beginPath();
@@ -325,6 +393,7 @@
         if (game.timeLeft <= 0) {
           game.timeLeft = 0;
           game.running = false;
+          stopMusic();
           updateHud();
           render();
           return;
@@ -349,18 +418,22 @@
 
       startBtn.addEventListener("click", () => {
         if (game.running) return;
+        ensureAudio();
         if (game.timeLeft <= 0) {
           game.timeLeft = game.duration;
           game.score = 0;
           game.level = 1;
           game.mice = [];
+          cat.size = cat.baseSize;
         }
         game.running = true;
+        startMusic();
         game.lastFrame = 0;
         requestAnimationFrame(gameLoop);
       });
 
       restartBtn.addEventListener("click", () => {
+        stopMusic();
         resetGame();
       });
 

@@ -14,3 +14,5 @@ Ein kleines Browser-Spiel in einfachem HTML/CSS/JavaScript.
 - Ziel: Möglichst viele Mäuse in 60 Sekunden fangen.
 - Schwierigkeitsgrad: Alle 5 Punkte steigt das Level.
 - Mit höherem Level erscheinen Mäuse häufiger und die Katze wird schneller.
+- Sound: Hintergrundmusik während des Spiels + Fang-Soundeffekt bei jeder gefangenen Maus.
+- Wachstum: Die Katze wird bei jeder gefangenen Maus etwas größer.
