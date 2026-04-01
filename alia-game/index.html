@@ -3,104 +3,50 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Alya und Mustafa Dayi Spiel – Katze und Mäuse</title>
+    <title>Alya und Mustafa Dayi Spiel – Endlosstraße</title>
     <style>
-      :root {
-        color-scheme: dark;
-      }
-
+      :root { color-scheme: dark; }
       body {
         margin: 0;
-        font-family: Arial, sans-serif;
-        background: radial-gradient(circle at top, #1d4ed8 0%, #0f172a 45%, #020617 100%);
-        color: #e2e8f0;
-        display: flex;
-        justify-content: center;
-        align-items: center;
         min-height: 100vh;
+        display: grid;
+        place-items: center;
+        font-family: Arial, sans-serif;
+        color: #e2e8f0;
+        background: radial-gradient(circle at top, #1d4ed8 0%, #0b1120 55%, #020617 100%);
       }
-
-      .game-wrap {
-        width: min(92vw, 860px);
-      }
-
-      h1 {
-        margin: 0 0 0.4rem;
-        font-size: 1.45rem;
-      }
-
-      .info {
-        margin-bottom: 0.8rem;
-        color: #cbd5e1;
-      }
-
-      .hud {
-        display: flex;
-        gap: 1rem;
-        margin-bottom: 0.6rem;
-        font-weight: 700;
-        flex-wrap: wrap;
-      }
-
+      .game-wrap { width: min(94vw, 860px); }
+      h1 { margin: 0 0 0.4rem; font-size: 1.4rem; }
+      .info { margin: 0 0 0.7rem; color: #cbd5e1; }
+      .hud { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.6rem; font-weight: 700; }
       canvas {
-        display: block;
-        width: 100%;
-        height: auto;
-        background: linear-gradient(180deg, #1e3a8a 0%, #0f172a 65%, #020617 100%);
-        border: 2px solid #334155;
-        border-radius: 8px;
-        box-shadow: 0 10px 35px rgba(15, 23, 42, 0.55);
+        width: 100%; height: auto; display: block;
+        border-radius: 10px; border: 2px solid #334155;
+        background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
+        box-shadow: 0 10px 32px rgba(2, 6, 23, 0.65);
       }
-
-      .actions {
-        margin-top: 0.7rem;
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-      }
-
-      button {
-        border: 0;
-        border-radius: 6px;
-        padding: 0.55rem 0.9rem;
-        cursor: pointer;
-        font-weight: 700;
-      }
-
-      #startBtn {
-        background: #22c55e;
-        color: #07210f;
-      }
-
-      #restartBtn {
-        background: #38bdf8;
-        color: #042030;
-      }
-
-      .hint {
-        margin-top: 0.6rem;
-        color: #94a3b8;
-        font-size: 0.95rem;
-      }
+      .actions { margin-top: 0.7rem; display: flex; gap: 0.6rem; }
+      button { border: 0; border-radius: 6px; padding: 0.55rem 0.9rem; font-weight: 700; cursor: pointer; }
+      #startBtn { background: #22c55e; color: #052e16; }
+      #restartBtn { background: #38bdf8; color: #082f49; }
+      .hint { margin-top: 0.6rem; color: #94a3b8; }
     </style>
   </head>
   <body>
     <main class="game-wrap">
       <h1>🎮 Alya und Mustafa Dayi Spiel</h1>
-      <p class="info">
-        Steuere die Katze mit <strong>Pfeiltasten</strong> oder <strong>WASD</strong>. Fange so viele Mäuse wie möglich.
-      </p>
+      <p class="info">Bewege die Katze nur mit <strong>Links/Rechts</strong> (oder A/D), fange Mäuse und weiche Fallen aus.</p>
       <div class="hud">
         <div>Punkte: <span id="score">0</span></div>
         <div>Level: <span id="level">1</span></div>
         <div>Zeit: <span id="time">60</span>s</div>
       </div>
-      <canvas id="gameCanvas" width="840" height="480"></canvas>
+      <canvas id="gameCanvas" width="840" height="520"></canvas>
       <div class="actions">
         <button id="startBtn">Start</button>
         <button id="restartBtn">Neu starten</button>
       </div>
-      <p class="hint">Tipp: Je höher das Level, desto schneller läuft die Katze und desto häufiger erscheinen Mäuse.</p>
+      <p class="hint">Wenn du eine Falle berührst: Punkte zurück auf 0 und Katze wieder klein.</p>
     </main>
 
     <script>
@@ -112,6 +58,7 @@
       const startBtn = document.getElementById("startBtn");
       const restartBtn = document.getElementById("restartBtn");
 
+      const road = { topWidth: 180, bottomWidth: 620, horizonY: 70, stripeOffset: 0 };
       const game = {
         running: false,
         duration: 60,
@@ -119,82 +66,30 @@
         score: 0,
         level: 1,
         keys: {},
-        mice: [],
-        traps: [],
+        entities: [],
         mouseSpawnTimer: 0,
         trapSpawnTimer: 0,
         lastFrame: 0,
       };
 
       const cat = {
-        x: 120,
-        y: 120,
-        size: 28,
-        baseSize: 28,
-        maxSize: 60,
-        speed: 220,
+        x: canvas.width / 2,
+        y: canvas.height - 86,
+        baseSize: 24,
+        size: 24,
+        maxSize: 52,
+        speedX: 360,
       };
 
       let audioCtx = null;
       let musicTimer = null;
-      let musicStep = 0;
-
-      function resetGame() {
-        game.running = false;
-        game.timeLeft = game.duration;
-        game.score = 0;
-        game.level = 1;
-        game.keys = {};
-        game.mice = [];
-        game.traps = [];
-        game.mouseSpawnTimer = 0;
-        game.trapSpawnTimer = 0;
-        cat.x = 120;
-        cat.y = 120;
-        cat.size = cat.baseSize;
-        updateHud();
-        render();
-      }
-
-      function updateHud() {
-        scoreEl.textContent = String(game.score);
-        levelEl.textContent = String(game.level);
-        timeEl.textContent = String(Math.max(0, Math.ceil(game.timeLeft)));
-      }
-
-      function levelFromScore(score) {
-        // Alle 5 Punkte steigt ein Level.
-        return Math.min(12, 1 + Math.floor(score / 5));
-      }
-
-      function spawnMouse() {
-        const radius = 12;
-        const padding = 20;
-        const x = padding + Math.random() * (canvas.width - 2 * padding);
-        const y = padding + Math.random() * (canvas.height - 2 * padding);
-        const colors = ["#fca5a5", "#fde68a", "#86efac", "#7dd3fc", "#c4b5fd"];
-        const color = colors[Math.floor(Math.random() * colors.length)];
-        game.mice.push({ x, y, radius, life: 5.5, color });
-      }
-
-      function spawnTrap() {
-        const size = 30;
-        const padding = 28;
-        const x = padding + Math.random() * (canvas.width - 2 * padding);
-        const y = padding + Math.random() * (canvas.height - 2 * padding);
-        game.traps.push({ x, y, size, life: 10 });
-      }
 
       function ensureAudio() {
-        if (!audioCtx) {
-          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audioCtx.state === "suspended") {
-          audioCtx.resume();
-        }
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === "suspended") audioCtx.resume();
       }
 
-      function playTone(frequency, duration = 0.12, type = "sine", volume = 0.06) {
+      function playTone(frequency, duration = 0.12, type = "sine", volume = 0.05) {
         if (!audioCtx) return;
         const now = audioCtx.currentTime;
         const osc = audioCtx.createOscillator();
@@ -210,27 +105,24 @@
       }
 
       function playCatchSound() {
-        if (!audioCtx) return;
-        playTone(540, 0.08, "triangle", 0.08);
-        setTimeout(() => playTone(760, 0.09, "triangle", 0.07), 45);
+        playTone(560, 0.09, "triangle", 0.07);
+        setTimeout(() => playTone(780, 0.1, "triangle", 0.06), 50);
       }
 
       function playTrapSound() {
-        if (!audioCtx) return;
-        playTone(180, 0.14, "square", 0.08);
-        setTimeout(() => playTone(130, 0.16, "square", 0.06), 60);
+        playTone(160, 0.15, "square", 0.08);
+        setTimeout(() => playTone(110, 0.2, "square", 0.07), 60);
       }
 
       function startMusic() {
         if (!audioCtx || musicTimer) return;
-        const notes = [220, 247, 262, 294, 330, 294, 262, 247];
-        musicStep = 0;
+        const notes = [220, 247, 262, 294, 262, 247];
+        let i = 0;
         musicTimer = setInterval(() => {
           if (!game.running) return;
-          const note = notes[musicStep % notes.length];
-          playTone(note, 0.18, "sawtooth", 0.03);
-          musicStep += 1;
-        }, 260);
+          playTone(notes[i % notes.length], 0.18, "sawtooth", 0.03);
+          i += 1;
+        }, 270);
       }
 
       function stopMusic() {
@@ -240,221 +132,198 @@
         }
       }
 
+      function roadEdges(y) {
+        const t = (y - road.horizonY) / (canvas.height - road.horizonY);
+        const width = road.topWidth + (road.bottomWidth - road.topWidth) * Math.max(0, Math.min(1, t));
+        const left = canvas.width / 2 - width / 2;
+        return { left, right: left + width };
+      }
+
+      function spawnEntity(type) {
+        const y = road.horizonY + 8;
+        const edges = roadEdges(y);
+        const x = edges.left + 25 + Math.random() * Math.max(20, edges.right - edges.left - 50);
+        const speed = type === "mouse" ? 170 + Math.random() * 55 : 190 + Math.random() * 65;
+        const size = type === "mouse" ? 13 : 18;
+        game.entities.push({ type, x, y, size, speed });
+      }
+
+      function resetGame() {
+        game.running = false;
+        game.timeLeft = game.duration;
+        game.score = 0;
+        game.level = 1;
+        game.keys = {};
+        game.entities = [];
+        game.mouseSpawnTimer = 0;
+        game.trapSpawnTimer = 0;
+        game.lastFrame = 0;
+        cat.size = cat.baseSize;
+        cat.x = canvas.width / 2;
+        updateHud();
+        render();
+      }
+
+      function updateHud() {
+        scoreEl.textContent = String(game.score);
+        levelEl.textContent = "1";
+        timeEl.textContent = String(Math.max(0, Math.ceil(game.timeLeft)));
+      }
+
       function updateCat(dt) {
-        const speed = cat.speed + (game.level - 1) * 28;
-        let dx = 0;
-        let dy = 0;
+        let move = 0;
+        if (game.keys["ArrowLeft"] || game.keys["a"] || game.keys["A"]) move -= 1;
+        if (game.keys["ArrowRight"] || game.keys["d"] || game.keys["D"]) move += 1;
+        cat.x += move * cat.speedX * dt;
 
-        if (game.keys["ArrowUp"] || game.keys["w"] || game.keys["W"]) dy -= 1;
-        if (game.keys["ArrowDown"] || game.keys["s"] || game.keys["S"]) dy += 1;
-        if (game.keys["ArrowLeft"] || game.keys["a"] || game.keys["A"]) dx -= 1;
-        if (game.keys["ArrowRight"] || game.keys["d"] || game.keys["D"]) dx += 1;
-
-        if (dx !== 0 || dy !== 0) {
-          const len = Math.hypot(dx, dy) || 1;
-          dx /= len;
-          dy /= len;
-          cat.x += dx * speed * dt;
-          cat.y += dy * speed * dt;
-        }
-
-        cat.x = Math.max(cat.size, Math.min(canvas.width - cat.size, cat.x));
-        cat.y = Math.max(cat.size, Math.min(canvas.height - cat.size, cat.y));
+        const edges = roadEdges(cat.y);
+        const margin = cat.size * 0.85;
+        cat.x = Math.max(edges.left + margin, Math.min(edges.right - margin, cat.x));
       }
 
-      function updateMice(dt) {
-        const active = [];
+      function updateEntities(dt) {
+        const keep = [];
+        for (const e of game.entities) {
+          e.y += e.speed * dt;
+          const dist = Math.hypot(cat.x - e.x, cat.y - e.y);
 
-        for (const mouse of game.mice) {
-          mouse.life -= dt;
-
-          const dist = Math.hypot(cat.x - mouse.x, cat.y - mouse.y);
-          if (dist < cat.size + mouse.radius) {
-            game.score += 1;
-            cat.size = Math.min(cat.maxSize, cat.size + 1.8);
-            playCatchSound();
+          if (dist < cat.size + e.size) {
+            if (e.type === "mouse") {
+              game.score += 1;
+              cat.size = Math.min(cat.maxSize, cat.size + 1.6);
+              playCatchSound();
+            } else {
+              game.score = 0;
+              cat.size = cat.baseSize;
+              playTrapSound();
+            }
             continue;
           }
 
-          if (mouse.life > 0) active.push(mouse);
+          if (e.y < canvas.height + 40) keep.push(e);
         }
-
-        game.mice = active;
+        game.entities = keep;
       }
 
-      function updateTraps(dt) {
-        const active = [];
+      function drawRoad() {
+        // Himmel
+        const sky = ctx.createLinearGradient(0, 0, 0, road.horizonY);
+        sky.addColorStop(0, "#2563eb");
+        sky.addColorStop(1, "#1d4ed8");
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, canvas.width, road.horizonY);
 
-        for (const trap of game.traps) {
-          trap.life -= dt;
-          const dist = Math.hypot(cat.x - trap.x, cat.y - trap.y);
-          if (dist < cat.size + trap.size * 0.5) {
-            cat.size = cat.baseSize;
-            playTrapSound();
-            continue;
-          }
-          if (trap.life > 0) active.push(trap);
+        // Straße in Perspektive
+        const topY = road.horizonY;
+        const bottomY = canvas.height;
+        const cx = canvas.width / 2;
+        const tw = road.topWidth;
+        const bw = road.bottomWidth;
+
+        ctx.fillStyle = "#1f2937";
+        ctx.beginPath();
+        ctx.moveTo(cx - tw / 2, topY);
+        ctx.lineTo(cx + tw / 2, topY);
+        ctx.lineTo(cx + bw / 2, bottomY);
+        ctx.lineTo(cx - bw / 2, bottomY);
+        ctx.closePath();
+        ctx.fill();
+
+        // Seitenlinien
+        ctx.strokeStyle = "#f8fafc";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(cx - tw / 2, topY);
+        ctx.lineTo(cx - bw / 2, bottomY);
+        ctx.moveTo(cx + tw / 2, topY);
+        ctx.lineTo(cx + bw / 2, bottomY);
+        ctx.stroke();
+
+        // Mittelstreifen (bewegt sich nach unten)
+        road.stripeOffset += 7;
+        for (let y = topY + (road.stripeOffset % 56) - 56; y < bottomY; y += 56) {
+          const edges = roadEdges(y);
+          const width = Math.max(4, (y - topY) * 0.02);
+          ctx.fillStyle = "#fde68a";
+          ctx.fillRect((edges.left + edges.right) / 2 - width / 2, y, width, 28);
         }
+      }
 
-        game.traps = active;
+      function drawMouse(e) {
+        ctx.save();
+        ctx.translate(e.x, e.y);
+        ctx.fillStyle = "#86efac";
+        ctx.beginPath();
+        ctx.ellipse(0, 0, e.size, e.size * 0.7, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#dcfce7";
+        ctx.beginPath();
+        ctx.arc(-e.size * 0.4, -e.size * 0.45, e.size * 0.24, 0, Math.PI * 2);
+        ctx.arc(e.size * 0.4, -e.size * 0.45, e.size * 0.24, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawTrap(e) {
+        ctx.save();
+        ctx.translate(e.x, e.y);
+        ctx.fillStyle = "#94a3b8";
+        ctx.fillRect(-e.size, 8, e.size * 2, 9);
+        for (let i = -3; i <= 3; i++) {
+          ctx.strokeStyle = "#e2e8f0";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(i * (e.size * 0.3), 8);
+          ctx.lineTo(i * (e.size * 0.3), -9);
+          ctx.stroke();
+        }
+        ctx.restore();
       }
 
       function drawCat() {
         ctx.save();
         ctx.translate(cat.x, cat.y);
-
         ctx.fillStyle = "#f8fafc";
         ctx.beginPath();
         ctx.arc(0, 0, cat.size, 0, Math.PI * 2);
         ctx.fill();
-
-        // Ohren
-        ctx.fillStyle = "#cbd5e1";
-        ctx.beginPath();
-        ctx.moveTo(-cat.size * 0.58, -cat.size * 0.64);
-        ctx.lineTo(-cat.size * 0.2, -cat.size * 1.3);
-        ctx.lineTo(cat.size * 0.08, -cat.size * 0.55);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(cat.size * 0.58, -cat.size * 0.64);
-        ctx.lineTo(cat.size * 0.2, -cat.size * 1.3);
-        ctx.lineTo(-cat.size * 0.08, -cat.size * 0.55);
-        ctx.fill();
-
-        // Augen
         ctx.fillStyle = "#0f172a";
         ctx.beginPath();
-        ctx.arc(-cat.size * 0.28, -cat.size * 0.18, cat.size * 0.11, 0, Math.PI * 2);
-        ctx.arc(cat.size * 0.28, -cat.size * 0.18, cat.size * 0.11, 0, Math.PI * 2);
+        ctx.arc(-cat.size * 0.25, -cat.size * 0.18, cat.size * 0.1, 0, Math.PI * 2);
+        ctx.arc(cat.size * 0.25, -cat.size * 0.18, cat.size * 0.1, 0, Math.PI * 2);
         ctx.fill();
-
-        // Nase
-        ctx.fillStyle = "#f472b6";
-        ctx.beginPath();
-        ctx.moveTo(0, cat.size * 0.18);
-        ctx.lineTo(-cat.size * 0.14, cat.size * 0.38);
-        ctx.lineTo(cat.size * 0.14, cat.size * 0.38);
-        ctx.closePath();
-        ctx.fill();
-
         ctx.restore();
       }
 
-      function drawMice() {
-        for (const mouse of game.mice) {
-          ctx.save();
-          ctx.translate(mouse.x, mouse.y);
-
-          // Maus-Körper
-          ctx.fillStyle = mouse.color;
-          ctx.beginPath();
-          ctx.ellipse(0, 0, 12, 8, 0, 0, Math.PI * 2);
-          ctx.fill();
-
-          // Ohren
-          ctx.fillStyle = "#cbd5e1";
-          ctx.beginPath();
-          ctx.arc(-6, -6, 3, 0, Math.PI * 2);
-          ctx.arc(6, -6, 3, 0, Math.PI * 2);
-          ctx.fill();
-
-          // Schwanz
-          ctx.strokeStyle = mouse.color;
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.moveTo(11, 1);
-          ctx.quadraticCurveTo(22, 6, 26, 16);
-          ctx.stroke();
-
-          ctx.restore();
-        }
-      }
-
-      function drawTraps() {
-        for (const trap of game.traps) {
-          ctx.save();
-          ctx.translate(trap.x, trap.y);
-          ctx.rotate(Math.sin(trap.life * 3) * 0.04);
-
-          // Basis
-          ctx.fillStyle = "#64748b";
-          ctx.fillRect(-trap.size * 0.5, 8, trap.size, 8);
-
-          // Federn/Zähne
-          const teeth = 7;
-          for (let i = 0; i < teeth; i++) {
-            const x = -trap.size * 0.5 + (i * trap.size) / (teeth - 1);
-            ctx.strokeStyle = "#e2e8f0";
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(x, 8);
-            ctx.lineTo(x, -8);
-            ctx.stroke();
-          }
-
-          ctx.strokeStyle = "#cbd5e1";
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.arc(0, 8, trap.size * 0.35, Math.PI, 0);
-          ctx.stroke();
-          ctx.restore();
-        }
-      }
-
       function drawOverlay(text) {
-        ctx.fillStyle = "rgba(2, 6, 23, 0.72)";
+        ctx.fillStyle = "rgba(2,6,23,0.65)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = "#e2e8f0";
         ctx.textAlign = "center";
-        ctx.font = "bold 38px Arial";
+        ctx.font = "bold 36px Arial";
         ctx.fillText(text, canvas.width / 2, canvas.height / 2 - 8);
-        ctx.font = "22px Arial";
-        ctx.fillText(`Punkte: ${game.score}`, canvas.width / 2, canvas.height / 2 + 34);
       }
 
       function render() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawRoad();
 
-        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        gradient.addColorStop(0, "#1d4ed8");
-        gradient.addColorStop(0.5, "#0f172a");
-        gradient.addColorStop(1, "#020617");
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Spielfeld-Raster
-        ctx.strokeStyle = "rgba(148, 163, 184, 0.18)";
-        ctx.lineWidth = 1;
-        for (let x = 0; x <= canvas.width; x += 40) {
-          ctx.beginPath();
-          ctx.moveTo(x, 0);
-          ctx.lineTo(x, canvas.height);
-          ctx.stroke();
-        }
-        for (let y = 0; y <= canvas.height; y += 40) {
-          ctx.beginPath();
-          ctx.moveTo(0, y);
-          ctx.lineTo(canvas.width, y);
-          ctx.stroke();
+        for (const e of game.entities) {
+          if (e.type === "mouse") drawMouse(e);
+          else drawTrap(e);
         }
 
-        drawTraps();
-        drawMice();
         drawCat();
 
-        if (!game.running && game.timeLeft === game.duration) {
-          drawOverlay("Start drücken");
-        } else if (!game.running && game.timeLeft <= 0) {
-          drawOverlay("Zeit vorbei!");
-        }
+        if (!game.running && game.timeLeft === game.duration) drawOverlay("Start drücken");
+        if (!game.running && game.timeLeft <= 0) drawOverlay("Runde vorbei");
       }
 
-      function gameLoop(timestamp) {
+      function gameLoop(ts) {
         if (!game.running) return;
-
-        if (!game.lastFrame) game.lastFrame = timestamp;
-        const dt = Math.min(0.035, (timestamp - game.lastFrame) / 1000);
-        game.lastFrame = timestamp;
+        if (!game.lastFrame) game.lastFrame = ts;
+        const dt = Math.min(0.035, (ts - game.lastFrame) / 1000);
+        game.lastFrame = ts;
 
         game.timeLeft -= dt;
         if (game.timeLeft <= 0) {
@@ -466,27 +335,19 @@
           return;
         }
 
-        game.level = levelFromScore(game.score);
-
-        // Mäuse erscheinen mit höherem Level öfter.
-        const spawnEvery = Math.max(0.25, 1.45 - game.level * 0.1);
         game.mouseSpawnTimer += dt;
-        if (game.mouseSpawnTimer >= spawnEvery) {
-          game.mouseSpawnTimer = 0;
-          spawnMouse();
-        }
-
-        // Fallen erscheinen seltener als Mäuse.
-        const trapEvery = Math.max(1.6, 4.8 - game.level * 0.22);
         game.trapSpawnTimer += dt;
-        if (game.trapSpawnTimer >= trapEvery) {
+        if (game.mouseSpawnTimer >= 0.95) {
+          game.mouseSpawnTimer = 0;
+          spawnEntity("mouse");
+        }
+        if (game.trapSpawnTimer >= 2.2) {
           game.trapSpawnTimer = 0;
-          spawnTrap();
+          spawnEntity("trap");
         }
 
         updateCat(dt);
-        updateMice(dt);
-        updateTraps(dt);
+        updateEntities(dt);
         updateHud();
         render();
         requestAnimationFrame(gameLoop);
@@ -498,14 +359,12 @@
         if (game.timeLeft <= 0) {
           game.timeLeft = game.duration;
           game.score = 0;
-          game.level = 1;
-          game.mice = [];
-          game.traps = [];
+          game.entities = [];
           cat.size = cat.baseSize;
         }
         game.running = true;
-        startMusic();
         game.lastFrame = 0;
+        startMusic();
         requestAnimationFrame(gameLoop);
       });
 
@@ -514,13 +373,8 @@
         resetGame();
       });
 
-      window.addEventListener("keydown", (event) => {
-        game.keys[event.key] = true;
-      });
-
-      window.addEventListener("keyup", (event) => {
-        game.keys[event.key] = false;
-      });
+      window.addEventListener("keydown", (e) => { game.keys[e.key] = true; });
+      window.addEventListener("keyup", (e) => { game.keys[e.key] = false; });
 
       resetGame();
     </script>

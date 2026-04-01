@@ -1,4 +1,4 @@
-# Alya und Mustafa Dayi Spiel – Katze fängt Mäuse
+# Alya und Mustafa Dayi Spiel – Endlosstraße
 
 Ein kleines Browser-Spiel in einfachem HTML/CSS/JavaScript.
 
@@ -6,14 +6,13 @@ Ein kleines Browser-Spiel in einfachem HTML/CSS/JavaScript.
 
 1. Öffne `alia-game/index.html` direkt im Browser.
 2. Klicke auf **Start**.
-3. Bewege die Katze mit **Pfeiltasten** oder **WASD**.
-4. Fange die Mäuse und erreiche höhere Level.
+3. Bewege die Katze nur mit **Links/Rechts** oder **A/D**.
 
 ## Spielidee
 
-- Ziel: Möglichst viele Mäuse in 60 Sekunden fangen.
-- Schwierigkeitsgrad: Alle 5 Punkte steigt das Level.
-- Mit höherem Level erscheinen Mäuse häufiger und die Katze wird schneller.
-- Sound: Hintergrundmusik während des Spiels + Fang-Soundeffekt bei jeder gefangenen Maus.
-- Wachstum: Die Katze wird bei jeder gefangenen Maus etwas größer.
-- Katzenfallen: Erscheinen seltener als Mäuse; wenn die Katze in eine Falle läuft, wird sie wieder klein, das Spiel läuft aber weiter.
+- Eine gerade Straße in Perspektive bewegt sich endlos auf dich zu.
+- Mäuse und Fallen kommen auf dich zu.
+- Ziel: Mäuse fangen und Fallen vermeiden.
+- Bei jeder gefangenen Maus wird die Katze größer.
+- Wenn die Katze eine Falle berührt: **Punkte zurück auf 0** und Katze wieder klein.
+- Eine Runde dauert 60 Sekunden (ein Level).
