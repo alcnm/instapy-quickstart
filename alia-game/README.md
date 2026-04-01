@@ -11,8 +11,10 @@ Ein kleines Browser-Spiel in einfachem HTML/CSS/JavaScript.
 ## Spielidee
 
 - Eine gerade Straße in Perspektive bewegt sich endlos auf dich zu.
+- Die Straße hat ein Pflasterstein-Muster (statt einer mittleren Linie), damit sie ruhiger wirkt.
 - Mäuse und Fallen kommen auf dich zu.
 - Ziel: Mäuse fangen und Fallen vermeiden.
 - Bei jeder gefangenen Maus wird die Katze größer.
 - Wenn die Katze eine Falle berührt: **Punkte zurück auf 0** und Katze wieder klein.
 - Eine Runde dauert 60 Sekunden (ein Level).
+- Am Straßenrand stehen kleine Menschen und Bäume für eine natürlichere Szene.

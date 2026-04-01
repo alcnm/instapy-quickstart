@@ -239,28 +239,107 @@
         ctx.lineTo(cx + bw / 2, bottomY);
         ctx.stroke();
 
-        // Mittelstreifen (bewegt sich nach unten)
-        road.stripeOffset += 7;
-        for (let y = topY + (road.stripeOffset % 56) - 56; y < bottomY; y += 56) {
+        // Pflasterstein-Muster statt mittlerer Linie
+        road.stripeOffset += 38 * (1 / 6);
+        for (let y = topY + (road.stripeOffset % 38) - 38; y < bottomY + 24; y += 38) {
+          const row = Math.floor((y - topY) / 38);
           const edges = roadEdges(y);
-          const width = Math.max(4, (y - topY) * 0.02);
-          ctx.fillStyle = "#fde68a";
-          ctx.fillRect((edges.left + edges.right) / 2 - width / 2, y, width, 28);
+          const roadW = edges.right - edges.left;
+          const cols = 8;
+          const gap = 2;
+          const brickW = (roadW - gap * (cols + 1)) / cols;
+          const brickH = 16;
+          const offset = row % 2 === 0 ? 0 : brickW / 2;
+          for (let c = -1; c <= cols; c++) {
+            const bx = edges.left + gap + c * (brickW + gap) + offset;
+            if (bx + brickW < edges.left || bx > edges.right) continue;
+            ctx.fillStyle = row % 2 === 0 ? "#374151" : "#334155";
+            ctx.fillRect(bx, y, brickW, brickH);
+          }
         }
+      }
+
+      function drawScenery() {
+        const layers = [0.18, 0.35, 0.55, 0.78, 0.93];
+        for (const t of layers) {
+          const y = road.horizonY + t * (canvas.height - road.horizonY);
+          const edges = roadEdges(y);
+          const scale = 0.45 + t * 0.75;
+
+          // Baum links
+          const treeX = edges.left - (35 + 20 * (1 - t));
+          ctx.fillStyle = "#7c2d12";
+          ctx.fillRect(treeX - 3 * scale, y - 16 * scale, 6 * scale, 16 * scale);
+          ctx.beginPath();
+          ctx.fillStyle = "#16a34a";
+          ctx.arc(treeX, y - 22 * scale, 10 * scale, 0, Math.PI * 2);
+          ctx.arc(treeX - 7 * scale, y - 18 * scale, 7 * scale, 0, Math.PI * 2);
+          ctx.arc(treeX + 7 * scale, y - 18 * scale, 7 * scale, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Baum rechts
+          const treeRX = edges.right + (35 + 20 * (1 - t));
+          ctx.fillStyle = "#7c2d12";
+          ctx.fillRect(treeRX - 3 * scale, y - 16 * scale, 6 * scale, 16 * scale);
+          ctx.beginPath();
+          ctx.fillStyle = "#22c55e";
+          ctx.arc(treeRX, y - 22 * scale, 10 * scale, 0, Math.PI * 2);
+          ctx.arc(treeRX - 7 * scale, y - 18 * scale, 7 * scale, 0, Math.PI * 2);
+          ctx.arc(treeRX + 7 * scale, y - 18 * scale, 7 * scale, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Kleine Personen am Straßenrand
+          const personLX = edges.left - (14 + 10 * (1 - t));
+          const personRX = edges.right + (14 + 10 * (1 - t));
+          drawPerson(personLX, y, scale * 0.85, "#60a5fa", "#1e293b");
+          drawPerson(personRX, y, scale * 0.85, "#f472b6", "#1e293b");
+        }
+      }
+
+      function drawPerson(x, y, s, shirt, pants) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.fillStyle = "#f1c27d";
+        ctx.beginPath();
+        ctx.arc(0, -15 * s, 4.5 * s, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = shirt;
+        ctx.fillRect(-3.8 * s, -10 * s, 7.6 * s, 9 * s);
+        ctx.fillStyle = pants;
+        ctx.fillRect(-3.3 * s, -1 * s, 2.5 * s, 7 * s);
+        ctx.fillRect(0.8 * s, -1 * s, 2.5 * s, 7 * s);
+        ctx.restore();
       }
 
       function drawMouse(e) {
         ctx.save();
         ctx.translate(e.x, e.y);
-        ctx.fillStyle = "#86efac";
+        ctx.fillStyle = "#d1d5db";
         ctx.beginPath();
-        ctx.ellipse(0, 0, e.size, e.size * 0.7, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, e.size * 1.1, e.size * 0.72, 0, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = "#dcfce7";
+        // Ohren
+        ctx.fillStyle = "#e5e7eb";
         ctx.beginPath();
-        ctx.arc(-e.size * 0.4, -e.size * 0.45, e.size * 0.24, 0, Math.PI * 2);
-        ctx.arc(e.size * 0.4, -e.size * 0.45, e.size * 0.24, 0, Math.PI * 2);
+        ctx.arc(-e.size * 0.5, -e.size * 0.45, e.size * 0.26, 0, Math.PI * 2);
+        ctx.arc(e.size * 0.45, -e.size * 0.45, e.size * 0.26, 0, Math.PI * 2);
         ctx.fill();
+        // Augen + Nase + Schwanz
+        ctx.fillStyle = "#111827";
+        ctx.beginPath();
+        ctx.arc(-e.size * 0.2, -e.size * 0.08, e.size * 0.08, 0, Math.PI * 2);
+        ctx.arc(e.size * 0.18, -e.size * 0.08, e.size * 0.08, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#fb7185";
+        ctx.beginPath();
+        ctx.arc(0, e.size * 0.12, e.size * 0.11, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#9ca3af";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(e.size * 1.1, 0);
+        ctx.quadraticCurveTo(e.size * 1.7, e.size * 0.3, e.size * 1.9, e.size * 0.9);
+        ctx.stroke();
         ctx.restore();
       }
 
@@ -292,6 +371,12 @@
         ctx.arc(-cat.size * 0.25, -cat.size * 0.18, cat.size * 0.1, 0, Math.PI * 2);
         ctx.arc(cat.size * 0.25, -cat.size * 0.18, cat.size * 0.1, 0, Math.PI * 2);
         ctx.fill();
+        // Mund
+        ctx.strokeStyle = "#334155";
+        ctx.lineWidth = Math.max(2, cat.size * 0.08);
+        ctx.beginPath();
+        ctx.arc(0, cat.size * 0.1, cat.size * 0.22, 0.2, Math.PI - 0.2);
+        ctx.stroke();
         ctx.restore();
       }
 
@@ -307,6 +392,7 @@
       function render() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         drawRoad();
+        drawScenery();
 
         for (const e of game.entities) {
           if (e.type === "mouse") drawMouse(e);
