@@ -39,6 +39,7 @@
       <div class="hud">
         <div>Punkte: <span id="score">0</span></div>
         <div>Level: <span id="level">1</span></div>
+        <div>Leben: <span id="lives">3</span></div>
         <div>Zeit: <span id="time">60</span>s</div>
       </div>
       <canvas id="gameCanvas" width="840" height="520"></canvas>
@@ -54,6 +55,7 @@
       const ctx = canvas.getContext("2d");
       const scoreEl = document.getElementById("score");
       const levelEl = document.getElementById("level");
+      const livesEl = document.getElementById("lives");
       const timeEl = document.getElementById("time");
       const startBtn = document.getElementById("startBtn");
       const restartBtn = document.getElementById("restartBtn");
@@ -64,7 +66,9 @@
         duration: 60,
         timeLeft: 60,
         score: 0,
+        progress: 0,
         level: 1,
+        lives: 3,
         keys: {},
         entities: [],
         mouseSpawnTimer: 0,
@@ -140,19 +144,50 @@
       }
 
       function spawnEntity(type) {
+        if (type === "human") {
+          const y = road.horizonY + 120 + Math.random() * (canvas.height - road.horizonY - 190);
+          const edges = roadEdges(y);
+          const fromLeft = Math.random() < 0.5;
+          const x = fromLeft ? edges.left - 24 : edges.right + 24;
+          const speedX = (fromLeft ? 1 : -1) * (58 + Math.random() * 34);
+          game.entities.push({ type, x, y, size: 14, speed: 8, speedX, drift: false });
+          return;
+        }
+
         const y = road.horizonY + 8;
         const edges = roadEdges(y);
         const x = edges.left + 25 + Math.random() * Math.max(20, edges.right - edges.left - 50);
         const speed = type === "mouse" ? 170 + Math.random() * 55 : 190 + Math.random() * 65;
         const size = type === "mouse" ? 13 : 18;
-        game.entities.push({ type, x, y, size, speed });
+        const chance =
+          type === "mouse"
+            ? game.level >= 3
+              ? 0.62
+              : game.level >= 2
+                ? 0.45
+                : 0
+            : game.level >= 3
+              ? 0.28
+              : 0;
+        const drift = Math.random() < chance;
+        const speedX = drift ? (Math.random() < 0.5 ? -1 : 1) * (30 + Math.random() * 35) : 0;
+        game.entities.push({ type, x, y, size, speed, drift, speedX });
+      }
+
+      function levelFromProgress(progress) {
+        if (progress >= 30) return 4;
+        if (progress >= 20) return 3;
+        if (progress >= 10) return 2;
+        return 1;
       }
 
       function resetGame() {
         game.running = false;
         game.timeLeft = game.duration;
         game.score = 0;
+        game.progress = 0;
         game.level = 1;
+        game.lives = 3;
         game.keys = {};
         game.entities = [];
         game.mouseSpawnTimer = 0;
@@ -166,7 +201,8 @@
 
       function updateHud() {
         scoreEl.textContent = String(game.score);
-        levelEl.textContent = "1";
+        levelEl.textContent = String(game.level);
+        livesEl.textContent = String(game.lives);
         timeEl.textContent = String(Math.max(0, Math.ceil(game.timeLeft)));
       }
 
@@ -185,22 +221,45 @@
         const keep = [];
         for (const e of game.entities) {
           e.y += e.speed * dt;
+          if (e.drift) e.x += e.speedX * dt;
+          if (e.type === "human") e.x += e.speedX * dt;
+
+          const edges = roadEdges(Math.max(road.horizonY + 10, e.y));
+          if (e.type !== "human") {
+            if (e.x < edges.left + 8 || e.x > edges.right - 8) e.speedX *= -1;
+            e.x = Math.max(edges.left + 8, Math.min(edges.right - 8, e.x));
+          }
+
           const dist = Math.hypot(cat.x - e.x, cat.y - e.y);
 
           if (dist < cat.size + e.size) {
             if (e.type === "mouse") {
               game.score += 1;
+              game.progress += 1;
               cat.size = Math.min(cat.maxSize, cat.size + 1.6);
               playCatchSound();
             } else {
+              game.lives -= 1;
               game.score = 0;
               cat.size = cat.baseSize;
               playTrapSound();
+              if (game.lives <= 0) {
+                game.running = false;
+                stopMusic();
+                updateHud();
+                render();
+                return;
+              }
             }
             continue;
           }
 
-          if (e.y < canvas.height + 40) keep.push(e);
+          if (e.type === "human") {
+            const offRoad = e.x < edges.left - 40 || e.x > edges.right + 40;
+            if (!offRoad) keep.push(e);
+          } else if (e.y < canvas.height + 40) {
+            keep.push(e);
+          }
         }
         game.entities = keep;
       }
@@ -392,6 +451,22 @@
         ctx.restore();
       }
 
+      function drawHumanOnRoad(e) {
+        ctx.save();
+        ctx.translate(e.x, e.y);
+        const s = 1.2;
+        ctx.fillStyle = "#f1c27d";
+        ctx.beginPath();
+        ctx.arc(0, -14 * s, 4.3 * s, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#f59e0b";
+        ctx.fillRect(-4 * s, -9 * s, 8 * s, 9 * s);
+        ctx.fillStyle = "#334155";
+        ctx.fillRect(-3.5 * s, 0, 2.5 * s, 7 * s);
+        ctx.fillRect(1 * s, 0, 2.5 * s, 7 * s);
+        ctx.restore();
+      }
+
       function drawCat() {
         ctx.save();
         ctx.translate(cat.x, cat.y);
@@ -455,13 +530,15 @@
 
         for (const e of game.entities) {
           if (e.type === "mouse") drawMouse(e);
-          else drawTrap(e);
+          else if (e.type === "trap") drawTrap(e);
+          else drawHumanOnRoad(e);
         }
 
         drawCat();
 
-        if (!game.running && game.timeLeft === game.duration) drawOverlay("Start drücken");
-        if (!game.running && game.timeLeft <= 0) drawOverlay("Runde vorbei");
+        if (!game.running && game.lives <= 0) drawOverlay("Game Over");
+        else if (!game.running && game.timeLeft === game.duration) drawOverlay("Start drücken");
+        else if (!game.running && game.timeLeft <= 0) drawOverlay("Runde vorbei");
       }
 
       function gameLoop(ts) {
@@ -480,6 +557,8 @@
           return;
         }
 
+        game.level = levelFromProgress(game.progress);
+
         game.mouseSpawnTimer += dt;
         game.trapSpawnTimer += dt;
         if (game.mouseSpawnTimer >= 0.95) {
@@ -489,6 +568,9 @@
         if (game.trapSpawnTimer >= 2.2) {
           game.trapSpawnTimer = 0;
           spawnEntity("trap");
+        }
+        if (game.level >= 4 && Math.random() < 0.013) {
+          spawnEntity("human");
         }
 
         updateCat(dt);
@@ -504,6 +586,9 @@
         if (game.timeLeft <= 0) {
           game.timeLeft = game.duration;
           game.score = 0;
+          game.progress = 0;
+          game.level = 1;
+          game.lives = 3;
           game.entities = [];
           cat.size = cat.baseSize;
         }
